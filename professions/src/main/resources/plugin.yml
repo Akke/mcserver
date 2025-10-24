@@ -1,0 +1,8 @@
+name: Professions
+main: com.akkelw.professions.ProfPlugin
+version: 1.0.0
+api-version: '1.21'
+commands:
+  prof:
+    description: Open professions UI / admin test tools
+    usage: /prof [addxp|choose]
