@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.block.CauldronLevelChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -49,69 +50,69 @@ public class BlockClickListener implements Listener {
             Block blockClicked = event.getClickedBlock();
 
             if(blockClicked != null) {
-                if(blockClicked.getType() == Material.CAULDRON) {
-                    Player player = event.getPlayer();
+                if(!blockClicked.getType().name().endsWith("_CAULDRON") && !blockClicked.getType().name().equals("CAULDRON")) return;
 
-                    UUID id = player.getUniqueId();
-                    Location loc = blockClicked.getLocation();
+                Player player = event.getPlayer();
 
-                    if(cauldronManager.isInUse(loc) && !id.equals(cauldronManager.getUser(loc))) {
-                        player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
-                        event.setCancelled(true);
-                        return;
-                    }
+                UUID id = player.getUniqueId();
+                Location loc = blockClicked.getLocation();
 
-                    ItemStack inHand = (event.getHand() == EquipmentSlot.HAND)
-                            ? player.getInventory().getItemInMainHand()
-                            : player.getInventory().getItemInOffHand();
-
-                    RecipeProcess proc = cauldronManager.getProcess(loc);
-                    if(proc == null) {
-                        if(inHand.getType() != Material.AIR) {
-                            event.setCancelled(true);
-                            player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
-                            return;
-                        }
-
-                        gui.open(player, blockClicked);
-                        return;
-                    }
-
-                    if(proc.isLocked()) {
-                        player.sendMessage(ChatColor.YELLOW + "That brewing process is locked.");
-                        return;
-                    }
-
-                    // Otherwise, continue the active process step
-                    ActionType lastBrewingAction = plugin.getLastBrewingAction(player);
-                    if(lastBrewingAction != null && lastBrewingAction != ActionType.ADD) {
-                        if(inHand.getType() != Material.AIR) {
-                            event.setCancelled(true);
-                            player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
-                            return;
-                        }
-                    }
-
-                    if(lastBrewingAction == null) {
-                        if(inHand.getType() != Material.AIR) {
-                            event.setCancelled(true);
-                            player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
-                            return;
-                        }
-
-                        plugin.openBrewingOptions(player, blockClicked);
-                        return;
-                    }
-
-                    ItemStack item = player.getInventory().getItemInMainHand();
-                    if (item == null) return;
-
-                    Material type = item.getType();
-                    int amount = item.getAmount();
-
-                    // Now safely process the step
-                    proc.processStep(lastBrewingAction, type, amount, blockClicked);
+                if(cauldronManager.isInUse(loc) && !id.equals(cauldronManager.getUser(loc))) {
+                    player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
+                    event.setCancelled(true);
+                    return;
                 }
+
+                ItemStack inHand = (event.getHand() == EquipmentSlot.HAND)
+                        ? player.getInventory().getItemInMainHand()
+                        : player.getInventory().getItemInOffHand();
+
+                RecipeProcess proc = cauldronManager.getProcess(loc);
+                if(proc == null) {
+                    if(inHand.getType() != Material.AIR) {
+                        event.setCancelled(true);
+                        player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
+                        return;
+                    }
+
+                    gui.open(player, blockClicked);
+                    return;
+                }
+
+                if(proc.isLocked()) {
+                    player.sendMessage(ChatColor.YELLOW + "That brewing process is locked.");
+                    return;
+                }
+
+                // Otherwise, continue the active process step
+                ActionType lastBrewingAction = plugin.getLastBrewingAction(player);
+                if(lastBrewingAction != null && lastBrewingAction != ActionType.ADD) {
+                    if(inHand.getType() != Material.AIR) {
+                        event.setCancelled(true);
+                        player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
+                        return;
+                    }
+                }
+
+                if(lastBrewingAction == null) {
+                    if(inHand.getType() != Material.AIR) {
+                        event.setCancelled(true);
+                        player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
+                        return;
+                    }
+
+                    plugin.openBrewingOptions(player, blockClicked);
+                    return;
+                }
+
+                ItemStack item = player.getInventory().getItemInMainHand();
+                if (item == null) return;
+
+                Material type = item.getType();
+                int amount = item.getAmount();
+
+                // Now safely process the step
+                proc.processStep(lastBrewingAction, type, amount, blockClicked);
             }
         }
     }
@@ -127,8 +128,37 @@ public class BlockClickListener implements Listener {
         if (!isAnyCauldron) return;
 
         ItemStack used = e.getItem();
-        if (used != null && used.getType() == Material.BUCKET) {
+        if (used != null && (used.getType() == Material.BUCKET || used.getType() == Material.GLASS_BOTTLE)) {
             e.setCancelled(true);
         }
     }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onCauldronChange(CauldronLevelChangeEvent e) {
+        Material type = e.getBlock().getType();
+        // Only target real cauldrons
+        if (!(type == Material.CAULDRON || type.name().endsWith("_CAULDRON"))) return;
+
+        // Cancel ALL automatic fluid level changes unless explicitly allowed
+        switch (e.getReason()) {
+            // Bucket and bottle interactions
+            case BOTTLE_FILL:
+            case BOTTLE_EMPTY:
+            case BUCKET_FILL:
+            case BUCKET_EMPTY:
+
+                // Snow and powder snow interactions
+            case EXTINGUISH:
+            case EVAPORATE:
+
+                // Misc fill sources
+            case UNKNOWN:
+                e.setCancelled(true);
+                break;
+
+            default:
+                break;
+        }
+    }
+
 }

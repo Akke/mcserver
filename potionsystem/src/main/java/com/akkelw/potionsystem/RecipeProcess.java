@@ -61,7 +61,7 @@ public class RecipeProcess implements Listener {
         this.actions = this.config.getMapList("actions");
         this.cauldronManager = plgn.getCauldronManager();
         this.playerId = player.getUniqueId();
-        this.cauldronLoc = cauldron.getLocation().getBlock().getLocation();
+        this.cauldronLoc = CauldronManager.normalize(cauldron);
     }
 
     public UUID getPlayerId() { return playerId; }
@@ -433,7 +433,7 @@ public class RecipeProcess implements Listener {
 
         Player player = (Player) e.getPlayer();
         UUID id = player.getUniqueId();
-        Location loc = holder.getCauldronLoc().getBlock().getLocation();
+        Location loc = holder.getCauldronLoc();
 
         RecipeProcess proc = cauldronManager.getProcess(loc);
 
@@ -453,7 +453,7 @@ public class RecipeProcess implements Listener {
             return;
         }
 
-        Location loc = e.getBlock().getLocation().getBlock().getLocation();
+        Location loc = e.getBlock().getLocation();
         cauldronManager.stopAllForCauldron(loc);
     }
 }

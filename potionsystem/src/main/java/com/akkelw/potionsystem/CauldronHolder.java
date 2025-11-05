@@ -16,7 +16,7 @@ public final class CauldronHolder implements InventoryHolder {
 
     public CauldronHolder(Block cauldron) {
         this.cauldron = cauldron;
-        this.cauldronLoc = cauldron.getLocation().getBlock().getLocation();
+        this.cauldronLoc = CauldronManager.normalize(cauldron);
     }
 
     public Block getCauldron() { return cauldron; }

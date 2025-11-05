@@ -1,6 +1,7 @@
 package com.akkelw.potionsystem;
 
 import org.bukkit.Location;
+import org.bukkit.block.Block;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,7 +13,7 @@ public final class CauldronManager {
     private final Map<Location, RecipeProcess> cauldronToProcess = new HashMap<>();
 
     private static Location blockLoc(Location loc) {
-        return loc.getBlock().getLocation();
+        return normalize(loc.getBlock());
     }
 
     public boolean isInUse(Location loc) {
@@ -25,6 +26,16 @@ public final class CauldronManager {
 
     public Location getCauldron(UUID playerId) {
         return playerToCauldron.get(playerId);
+    }
+
+    public static Location normalize(Block block) {
+        Location loc = block.getLocation();
+        return new Location(
+                loc.getWorld(),
+                loc.getBlockX(),
+                loc.getBlockY(),
+                loc.getBlockZ()
+        );
     }
 
     public boolean startUsing(UUID playerId, Location loc) {
