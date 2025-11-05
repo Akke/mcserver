@@ -35,8 +35,6 @@ import com.akkelw.potionsystem.gui.BrewingOptionsGui.ActionType;
 import net.wesjd.anvilgui.AnvilGUI;
 
 public class RecipeProcess implements Listener {
-    private final Map<UUID, RecipeProcess> currentTask = new HashMap<>();
-
     private final Plugin plugin;
     private final Player player;
     private final Block cauldron;
@@ -44,7 +42,8 @@ public class RecipeProcess implements Listener {
     private  final List<Map<?, ?>> actions;
     private final ConfigurationSection config;
     private int step = 0;
-    private boolean locked = false;           
+    private boolean locked = false;
+    private boolean hasWater = false;
     private int stirCountCw = 0;                   
     private int stirCountCcw = 0;
     private final CauldronManager cauldronManager;
@@ -70,17 +69,17 @@ public class RecipeProcess implements Listener {
     public boolean isLocked() { return this.locked; }
 
     private void lock(BrewingOptionsGui.ActionType action) {
-        this.currentTask.put(this.player.getUniqueId(), this);
         this.locked = true;
     }
 
     private void unlock() {
         this.locked = false;
-        this.currentTask.remove(this.player.getUniqueId());
     }
 
     public void start() {
         if(this.config == null) return;
+
+        Bukkit.getPluginManager().registerEvents(this, this.plugin);
 
         UUID id = this.player.getUniqueId();
 
@@ -144,17 +143,18 @@ public class RecipeProcess implements Listener {
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
         cauldronManager.stopUsing(this.player.getUniqueId());
+        org.bukkit.event.HandlerList.unregisterAll(this);
     }
 
-    public void fail(String s) {
+    public void fail() {
         this.plugin.removeLastBrewingAction(this.player);
         this.player.closeInventory();
         unlock();
-        this.player.sendMessage(s);
         this.player.sendMessage("Oops! You did something wrong and the potion exploded! (" + this.elixirCode + ")");
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
         cauldronManager.stopUsing(this.player.getUniqueId());
+        org.bukkit.event.HandlerList.unregisterAll(this);
     }
 
     public void cancel() {
@@ -165,6 +165,7 @@ public class RecipeProcess implements Listener {
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
         cauldronManager.stopUsing(this.player.getUniqueId());
+        org.bukkit.event.HandlerList.unregisterAll(this);
     }
 
     public void processStep(ActionType action, Material material, int materialAmount, Block blockClicked) {
@@ -176,6 +177,11 @@ public class RecipeProcess implements Listener {
         String expected = (String) current.get("action");
         ActionType expectedAction = ActionType.fromString(expected);
 
+        if(expectedAction != action) {
+            fail();
+            return;
+        }
+
         switch(action) {
             case ADD: // have to lock since we are waiting for the player to add ingredients by clicking on the cauldron with them (so GUI wont open)
                 lock(action);
@@ -184,7 +190,7 @@ public class RecipeProcess implements Listener {
                     unlock();
                     nextStep();
                 } else {
-                    fail("1");
+                    fail();
                 }
 
                 return;
@@ -218,8 +224,8 @@ public class RecipeProcess implements Listener {
                 lock(action);
 
                 startBlockTimer(this.plugin, blockClicked, 2, () -> {
-                    if(this.stirCountCcw > 0 || expectedAction == BrewingOptionsGui.ActionType.STIR_CCW) {
-                        fail("8");
+                    if(this.stirCountCcw > 0) {
+                        fail();
                         return;
                     }
 
@@ -239,8 +245,8 @@ public class RecipeProcess implements Listener {
                 lock(action);
 
                 startBlockTimer(this.plugin, blockClicked, 2, () -> {
-                    if(this.stirCountCw > 0 || expectedAction == BrewingOptionsGui.ActionType.STIR_CW) {
-                        fail("9");
+                    if(this.stirCountCw > 0) {
+                        fail();
                         return;
                     }
 
@@ -288,27 +294,9 @@ public class RecipeProcess implements Listener {
 
     public void onBrewAction(ActionType action, Material type, Integer amount) {
         if(this.locked) {
-            fail("2");
+            fail();
             return;
         }
-
-        /*Map<?, ?> current = this.actions.get(this.step-1);
-        String supposedAction = (String) current.get("action");
-        ActionType expectedAction = ActionType.fromString(supposedAction);
-
-        if(expectedAction == null) {
-            fail("7");
-            return;
-        }
-
-        // we should only fail instantly upon clicking on these following brewing options
-        // (other options such as anvil inputs fail when you enter wrong data)
-        if(action == BrewingOptionsGui.ActionType.ADD) {
-            if (expectedAction != action) {
-                fail("3"); 
-                return;
-            }
-        }*/
 
         this.player.closeInventory();
         
@@ -366,7 +354,7 @@ public class RecipeProcess implements Listener {
                 }
 
                 if(expectedAmount == -1) {
-                    fail("6");
+                    fail();
                 } else {
                     if(expectedAmount == temp) {
                         if(callback == null) {
@@ -375,7 +363,7 @@ public class RecipeProcess implements Listener {
                             callback.run();
                         }
                     } else {
-                        fail("4");
+                        fail();
                     }
                 }
                 

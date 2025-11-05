@@ -9,6 +9,10 @@ elixirs:
       amplifier: 1       # Speed II
     actions:
       - action: ADD
+        ingredient_name: WATER_BUCKET
+        amount: 1
+
+      - action: ADD
         ingredient_name: WHEAT_SEEDS
         amount: 2
 

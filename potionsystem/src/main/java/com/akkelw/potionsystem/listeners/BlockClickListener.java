@@ -51,12 +51,6 @@ public class BlockClickListener implements Listener {
                 if(blockClicked.getType() == Material.CAULDRON) {
                     Player player = event.getPlayer();
 
-                    /*RecipeProcess proc = RecipeProcess.getProcess((Player) h);
-                    if (proc != null && proc.isLocked()) {
-                        ((Player) h).sendMessage("§cBusy: " + proc.getRunningAction());
-                        return;
-                    }*/
-
                     UUID id = player.getUniqueId();
                     Location loc = blockClicked.getLocation();
 
@@ -66,9 +60,18 @@ public class BlockClickListener implements Listener {
                         return;
                     }
 
-                    RecipeProcess proc = cauldronManager.getProcess(loc);
+                    ItemStack inHand = (event.getHand() == EquipmentSlot.HAND)
+                            ? player.getInventory().getItemInMainHand()
+                            : player.getInventory().getItemInOffHand();
 
+                    RecipeProcess proc = cauldronManager.getProcess(loc);
                     if(proc == null) {
+                        if(inHand.getType() != Material.AIR) {
+                            event.setCancelled(true);
+                            player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
+                            return;
+                        }
+
                         gui.open(player, blockClicked);
                         return;
                     }
@@ -80,7 +83,21 @@ public class BlockClickListener implements Listener {
 
                     // Otherwise, continue the active process step
                     ActionType lastBrewingAction = plugin.getLastBrewingAction(player);
-                    if (lastBrewingAction == null) {
+                    if(lastBrewingAction != null && lastBrewingAction != ActionType.ADD) {
+                        if(inHand.getType() != Material.AIR) {
+                            event.setCancelled(true);
+                            player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
+                            return;
+                        }
+                    }
+
+                    if(lastBrewingAction == null) {
+                        if(inHand.getType() != Material.AIR) {
+                            event.setCancelled(true);
+                            player.sendMessage(ChatColor.GRAY + "Empty your hand to interact with the cauldron.");
+                            return;
+                        }
+
                         plugin.openBrewingOptions(player, blockClicked);
                         return;
                     }
