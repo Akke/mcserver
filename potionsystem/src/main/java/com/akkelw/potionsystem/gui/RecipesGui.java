@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.akkelw.potionsystem.CauldronManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -43,10 +44,13 @@ public class RecipesGui implements Listener {
     private static final int ITEMS_PER_PAGE = CONTENT_SLOTS.length; // 28
 
     private final Map<UUID, List<ItemStack>> itemsByPlayer = new HashMap<>();
-    private final Map<UUID, Integer> pageByPlayer = new HashMap<>();   
+    private final Map<UUID, Integer> pageByPlayer = new HashMap<>();
 
-    public RecipesGui(Plugin plugin) { 
-        this.plugin = plugin; 
+    private final CauldronManager cauldronManager;
+
+    public RecipesGui(Plugin plugin) {
+        this.plugin = plugin;
+        this.cauldronManager = plugin.getCauldronManager();
     }
 
     @EventHandler
@@ -121,7 +125,6 @@ public class RecipesGui implements Listener {
 
     public void open(Player player, Block cauldron) {
         Inventory inv = Bukkit.createInventory(new CauldronHolder(cauldron), 54, ChatColor.DARK_AQUA + "Potion Recipes");
-        //Inventory inv = Bukkit.createInventory(player, 54, ChatColor.DARK_AQUA + "Potion Recipes");
         open.put(player.getUniqueId(), inv);
         player.openInventory(inv);
 

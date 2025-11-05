@@ -3,3 +3,6 @@ main: com.akkelw.potionsystem.Plugin
 version: 1.0
 api-version: '1.21'
 depend: [Professions]
+commands:
+  debugcauldronoccupant:
+    description: Debug cauldron occupancy

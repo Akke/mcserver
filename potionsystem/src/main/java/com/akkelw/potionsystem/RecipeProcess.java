@@ -1,6 +1,8 @@
 package com.akkelw.potionsystem;
 
-import java.net.http.WebSocket.Listener;
+import org.bukkit.*;
+import org.bukkit.event.Listener;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,16 +10,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -26,6 +26,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 
 import com.akkelw.potionsystem.gui.BrewingOptionsGui;
 import com.akkelw.potionsystem.gui.BrewingOptionsGui.ActionType;
@@ -33,20 +35,20 @@ import com.akkelw.potionsystem.gui.BrewingOptionsGui.ActionType;
 import net.wesjd.anvilgui.AnvilGUI;
 
 public class RecipeProcess implements Listener {
-    // shared across all RecipeProcess instances
     private static final Map<UUID, RecipeProcess> active = new HashMap<>();
     private final Map<UUID, RecipeProcess> currentTask = new HashMap<>();
 
-    private Plugin plugin;
-    private Player player;
+    private final Plugin plugin;
+    private final Player player;
     private final Block cauldron;
-    private String elixirCode;
-    private List<Map<?, ?>> actions;
+    private final String elixirCode;
+    private  final List<Map<?, ?>> actions;
     private final ConfigurationSection config;
     private int step = 0;
     private boolean locked = false;           
     private int stirCountCw = 0;                   
-    private int stirCountCcw = 0;                   
+    private int stirCountCcw = 0;
+    private final CauldronManager cauldronManager;
 
     public RecipeProcess(Plugin plgn, Player p, String elxCode, Block cauldron) {
         this.plugin = plgn;
@@ -54,9 +56,9 @@ public class RecipeProcess implements Listener {
         this.elixirCode = elxCode;
         this.config = this.plugin.getConfig().getConfigurationSection("elixirs." + this.elixirCode);
         this.player = p;
+        assert this.config != null;
         this.actions = this.config.getMapList("actions");
-        this.stirCountCw = stirCountCw;
-        this.stirCountCcw = stirCountCcw;
+        this.cauldronManager = plgn.getCauldronManager();
     }
 
     public static RecipeProcess get(Player p) {
@@ -93,7 +95,7 @@ public class RecipeProcess implements Listener {
             return;
         }
 
-        this.plugin.removeLastBrewingAction(this.player); // remove last action just in case
+        this.plugin.removeLastBrewingAction(this.player);
 
         active.put(id, this);
         this.player.sendMessage("Started potion making process for recipe '" + this.elixirCode + "'");
@@ -118,13 +120,13 @@ public class RecipeProcess implements Listener {
             ItemStack potion = new ItemStack(mat, 1);
             ItemMeta im = potion.getItemMeta();
 
-            if(im instanceof PotionMeta) {
-                PotionMeta meta = (PotionMeta) im;
+            if(im instanceof PotionMeta meta) {
                 String effect = result.getString("potion_effect", "SPEED");
                 int duration = result.getInt("duration", 30);
                 int amplifier = result.getInt("amplifier", 0);
 
-                PotionEffectType effectType = PotionEffectType.getByName(effect.toUpperCase());
+                PotionEffectType effectType = Registry.EFFECT.get(NamespacedKey.minecraft(effect.toLowerCase()));
+
                 if (effectType != null) {
                     meta.addCustomEffect(new PotionEffect(effectType, duration * 20, amplifier), true);
                 }
@@ -146,6 +148,7 @@ public class RecipeProcess implements Listener {
         this.player.sendMessage("You finished brewing " + this.elixirCode);
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
+        cauldronManager.stopUsing(this.player.getUniqueId());
     }
 
     public void fail(String s) {
@@ -157,6 +160,7 @@ public class RecipeProcess implements Listener {
         this.player.sendMessage("Oops! You did something wrong and the potion exploded! (" + this.elixirCode + ")");
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
+        cauldronManager.stopUsing(this.player.getUniqueId());
     }
 
     public void cancel() {
@@ -167,6 +171,7 @@ public class RecipeProcess implements Listener {
         this.player.sendMessage("Brewing cancelled.");
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
+        cauldronManager.stopUsing(this.player.getUniqueId());
     }
 
     public static boolean hasActive(Player p) {
@@ -208,7 +213,7 @@ public class RecipeProcess implements Listener {
                 duration = (boilDur != null) ? boilDur : -1;
 
                 askNumberInput("Set Boil Duration", duration, () -> {
-                    lock(action); 
+                    lock(action);
 
                     startBlockTimer(this.plugin, blockClicked, duration, () -> {
                         unlock();
@@ -264,7 +269,7 @@ public class RecipeProcess implements Listener {
                 duration = (waitDur != null) ? waitDur : -1;
 
                 askNumberInput("Set Wait Duration", duration, () -> {
-                    lock(action); 
+                    lock(action);
 
                     startBlockTimer(this.plugin, blockClicked, duration, () -> {
                         unlock();
@@ -424,5 +429,21 @@ public class RecipeProcess implements Listener {
     public void onQuit(PlayerQuitEvent e) {
         RecipeProcess p = active.remove(e.getPlayer().getUniqueId());
         if(p != null) p.cancel();
+        cauldronManager.stopUsing(e.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent e) {
+        if (!(e.getInventory().getHolder() instanceof CauldronHolder)) return;
+        CauldronHolder holder = (CauldronHolder) e.getInventory().getHolder();
+        UUID id = ((Player)e.getPlayer()).getUniqueId();
+        Location loc = holder.getCauldronLoc();
+        if (id.equals(cauldronManager.getUser(loc))) cauldronManager.stopUsing(id);
+    }
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent e) {
+        if (e.getBlock().getType() != Material.CAULDRON && e.getBlock().getType() != Material.WATER_CAULDRON) return;
+        cauldronManager.stopUsing(e.getBlock().getLocation());
     }
 }

@@ -3,7 +3,9 @@ package com.akkelw.potionsystem;
 import java.util.UUID;
 import java.util.logging.Logger;
 
+import com.akkelw.potionsystem.commands.CauldronDebugCommand;
 import org.bukkit.entity.Player;
+import org.bukkit.material.Cauldron;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -15,20 +17,23 @@ import com.akkelw.professions.api.ProfessionsAPI;
 
 /*
  * potionsystem java plugin
- * note to self: remember to track what player started the recipe process so people who didnt start it cant steal cauldron
+ * note to self: remember to track what player started the recipe process so people who didn't start it cant steal cauldron
  */
 public class Plugin extends JavaPlugin
 {
-    private static final Logger LOGGER=Logger.getLogger("potionsystem");
+    private static final Logger LOGGER=Logger.getLogger("potion system");
+    private CauldronManager cauldronManager;
     private ProfessionsAPI professionsAPI;
     public BrewingOptionsGui brewingOptionsGui;
 
     @Override
     public void onEnable()
     {
+        this.cauldronManager = new CauldronManager();
+
         saveDefaultConfig();
 
-        LOGGER.info("potionsystem enabled");
+        LOGGER.info("potion system enabled");
 
         RegisteredServiceProvider<ProfessionsAPI> reg = getServer().getServicesManager().getRegistration(ProfessionsAPI.class);
         if (reg != null) {
@@ -42,6 +47,8 @@ public class Plugin extends JavaPlugin
 
         getServer().getPluginManager().registerEvents(gui, this);
         getServer().getPluginManager().registerEvents(new BlockClickListener(this, gui), this);
+
+        getCommand("debugcauldronoccupant").setExecutor(new CauldronDebugCommand(cauldronManager));
         
         brewingOptionsGui = new BrewingOptionsGui(this, (player, action, type, amount) -> {
             RecipeProcess proc = RecipeProcess.get(player);
@@ -72,5 +79,9 @@ public class Plugin extends JavaPlugin
 
     public int getPotionLevel(UUID id) {
         return (professionsAPI != null) ? professionsAPI.getPotionMakingLevel(id) : 0;
+    }
+
+    public CauldronManager getCauldronManager() {
+        return cauldronManager;
     }
 }

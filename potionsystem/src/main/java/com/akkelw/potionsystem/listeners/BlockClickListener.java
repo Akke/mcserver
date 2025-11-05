@@ -1,5 +1,7 @@
 package com.akkelw.potionsystem.listeners;
 
+import com.akkelw.potionsystem.CauldronManager;
+import org.bukkit.Location;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 
@@ -8,6 +10,7 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
@@ -20,14 +23,19 @@ import net.md_5.bungee.api.ChatColor;
 import com.akkelw.potionsystem.gui.BrewingOptionsGui;
 import com.akkelw.potionsystem.gui.RecipesGui;
 
+import java.util.UUID;
+
 public class BlockClickListener implements Listener {
     private final Plugin plugin;
 
     private final RecipesGui gui;
 
+    private final CauldronManager cauldronManager;
+
     public BlockClickListener(Plugin plugin, RecipesGui gui) {
         this.plugin = plugin;
         this.gui = gui;
+        this.cauldronManager = plugin.getCauldronManager();
     }
 
     @EventHandler
@@ -49,9 +57,21 @@ public class BlockClickListener implements Listener {
                         return;
                     }*/
 
+                    UUID id = player.getUniqueId();
+                    Location loc = blockClicked.getLocation();
+
+                    if(cauldronManager.isInUse(loc) && !id.equals(cauldronManager.getUser(loc))) {
+                        player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
+                        event.setCancelled(true);
+                        return;
+                    }
+
                     if(!RecipeProcess.hasActive(player)) {
-                        // Recipe not in progress
-                        gui.open(player, blockClicked);
+                        if(cauldronManager.startUsing(id, loc)) {
+                            gui.open(player, blockClicked);
+                        } else {
+                            player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
+                        }
                     } else {
                         RecipeProcess proc = RecipeProcess.get(player);
                         if(proc != null) {
