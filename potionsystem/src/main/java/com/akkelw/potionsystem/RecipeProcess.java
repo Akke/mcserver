@@ -133,19 +133,22 @@ public class RecipeProcess implements Listener {
                 potion.setItemMeta(meta);
             }
 
-            /* Double Drop Rate logic */
-            int playerRank = this.plugin.getPotionLevel(this.player.getUniqueId());
+            /* Double/Triple Drop Rate logic */
+            int playerRank = plugin.getPotionLevel(player.getUniqueId());
             int itemAmount = 1;
-            double baseChance = 0.005; // 0.5% per rank
-            double chance = baseChance * playerRank;
-            chance = Math.min(chance, 1.0); // cap at 100%
 
-            if (Math.random() < chance) {
+            double baseChance = 0.005; // 0.5% per rank
+            double doubleChance = Math.min(baseChance * playerRank, 1.0);
+            double tripleChance = Math.min(baseChance * 0.5 * playerRank, 1.0); // 0.25% per rank (half of the base)
+
+            if (Math.random() < tripleChance) {
+                itemAmount *= 3;
+            } else if (Math.random() < doubleChance) {
                 itemAmount *= 2;
             }
 
-            for(int i = 0; i < itemAmount; i++) {
-                this.player.getInventory().addItem(potion);
+            for (int i = 0; i < itemAmount; i++) {
+                player.getInventory().addItem(potion);
             }
         }
     }
