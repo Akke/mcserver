@@ -143,6 +143,7 @@ public class RecipeProcess implements Listener {
         this.player.sendMessage("You finished brewing " + this.elixirCode);
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
+        cauldronManager.setWaterLevel(cauldron,0);
         cauldronManager.stopUsing(this.player.getUniqueId());
         org.bukkit.event.HandlerList.unregisterAll(this);
     }
@@ -154,6 +155,7 @@ public class RecipeProcess implements Listener {
         this.player.sendMessage("Oops! You did something wrong and the potion exploded! (" + this.elixirCode + ")");
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
+        cauldronManager.setWaterLevel(cauldron,0);
         cauldronManager.stopUsing(this.player.getUniqueId());
         org.bukkit.event.HandlerList.unregisterAll(this);
     }
@@ -165,6 +167,7 @@ public class RecipeProcess implements Listener {
         this.player.sendMessage("Brewing cancelled.");
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
+        cauldronManager.setWaterLevel(cauldron,0);
         cauldronManager.stopUsing(this.player.getUniqueId());
         org.bukkit.event.HandlerList.unregisterAll(this);
     }
@@ -322,13 +325,14 @@ public class RecipeProcess implements Listener {
                 player.getInventory().setItemInMainHand(new ItemStack(Material.BUCKET));
 
                 // Fill the cauldron visually
-                cauldron.setType(Material.WATER_CAULDRON, false);
+                cauldronManager.setWaterLevel(cauldron,3);
+                /*cauldron.setType(Material.WATER_CAULDRON, false);
                 BlockData data = cauldron.getBlockData();
                 if (data instanceof org.bukkit.block.data.Levelled) {
                     org.bukkit.block.data.Levelled lvl = (org.bukkit.block.data.Levelled) data;
                     lvl.setLevel(lvl.getMaximumLevel());   // 3
                     cauldron.setBlockData(lvl, false);
-                }
+                }*/
 
                 // Optional feedback
                 player.playSound(player.getLocation(), Sound.ITEM_BUCKET_EMPTY, 1f, 1f);

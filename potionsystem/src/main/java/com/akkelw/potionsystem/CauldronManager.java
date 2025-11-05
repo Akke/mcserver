@@ -1,7 +1,9 @@
 package com.akkelw.potionsystem;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -79,6 +81,21 @@ public final class CauldronManager {
             if (u != null) playerToCauldron.remove(u);
             return true;
         });
+    }
+
+    public void setWaterLevel(Block cauldron, Integer waterLevel) {
+        if(waterLevel == 0) {
+            cauldron.setType(Material.CAULDRON);
+            return;
+        }
+
+        cauldron.setType(Material.WATER_CAULDRON, false);
+        BlockData data = cauldron.getBlockData();
+        if (data instanceof org.bukkit.block.data.Levelled) {
+            org.bukkit.block.data.Levelled lvl = (org.bukkit.block.data.Levelled) data;
+            lvl.setLevel(waterLevel);   // 3
+            cauldron.setBlockData(lvl, false);
+        }
     }
 
     /* -------------------- Processes -------------------- */
