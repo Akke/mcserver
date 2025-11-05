@@ -143,8 +143,10 @@ public class RecipeProcess implements Listener {
 
             if (Math.random() < tripleChance) {
                 itemAmount *= 3;
+                this.player.sendMessage(ChatColor.GOLD + "Received 3x the amount from brewing potion.");
             } else if (Math.random() < doubleChance) {
                 itemAmount *= 2;
+                this.player.sendMessage(ChatColor.GOLD + "Received 2x the amount from brewing potion.");
             }
 
             for (int i = 0; i < itemAmount; i++) {
