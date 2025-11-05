@@ -84,6 +84,8 @@ public class RecipeProcess implements Listener {
 
         UUID id = this.player.getUniqueId();
 
+        hasWater = false;
+
         int requiredRank = this.config.getInt("required_rank");
         int playerRank = this.plugin.getPotionLevel(id);
 
@@ -182,6 +184,12 @@ public class RecipeProcess implements Listener {
         ActionType expectedAction = ActionType.fromString(expected);
 
         if(expectedAction != action) {
+            fail();
+            return;
+        }
+
+        if(!hasWater && (action == ActionType.ADD && material != Material.WATER_BUCKET)) {
+            this.player.sendMessage(ChatColor.YELLOW + "There's no water in the cauldron, water is required!");
             fail();
             return;
         }
@@ -323,19 +331,9 @@ public class RecipeProcess implements Listener {
         if(requiredIngredientMaterial == ingredient) {
             if(ingredient == Material.WATER_BUCKET) {
                 player.getInventory().setItemInMainHand(new ItemStack(Material.BUCKET));
-
-                // Fill the cauldron visually
                 cauldronManager.setWaterLevel(cauldron,3);
-                /*cauldron.setType(Material.WATER_CAULDRON, false);
-                BlockData data = cauldron.getBlockData();
-                if (data instanceof org.bukkit.block.data.Levelled) {
-                    org.bukkit.block.data.Levelled lvl = (org.bukkit.block.data.Levelled) data;
-                    lvl.setLevel(lvl.getMaximumLevel());   // 3
-                    cauldron.setBlockData(lvl, false);
-                }*/
-
-                // Optional feedback
                 player.playSound(player.getLocation(), Sound.ITEM_BUCKET_EMPTY, 1f, 1f);
+                hasWater = true;
             } else {
                 ItemStack toRemove = new ItemStack(ingredient, amount); // we remove all quantity of what they're holding instead of just the required amount
                 this.player.getInventory().removeItem(toRemove);
