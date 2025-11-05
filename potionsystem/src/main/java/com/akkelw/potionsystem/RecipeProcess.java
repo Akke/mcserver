@@ -1,6 +1,7 @@
 package com.akkelw.potionsystem;
 
 import org.bukkit.*;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.event.Listener;
 
 import java.util.Arrays;
@@ -186,6 +187,9 @@ public class RecipeProcess implements Listener {
             case ADD: // have to lock since we are waiting for the player to add ingredients by clicking on the cauldron with them (so GUI wont open)
                 lock(action);
 
+                plugin.getLogger().info("Material is " + material);
+                plugin.getLogger().info("materialAmount is " + materialAmount);
+
                 if(addIngredient(material, materialAmount)) {
                     unlock();
                     nextStep();
@@ -314,8 +318,24 @@ public class RecipeProcess implements Listener {
         Material requiredIngredientMaterial = Material.matchMaterial((String) requiredIngredient);
 
         if(requiredIngredientMaterial == ingredient) {
-            ItemStack toRemove = new ItemStack(ingredient, amount); // we remove all quantity of what they're holding instead of just the required amount
-            this.player.getInventory().removeItem(toRemove);
+            if(ingredient == Material.WATER_BUCKET) {
+                player.getInventory().setItemInMainHand(new ItemStack(Material.BUCKET));
+
+                // Fill the cauldron visually
+                cauldron.setType(Material.WATER_CAULDRON, false);
+                BlockData data = cauldron.getBlockData();
+                if (data instanceof org.bukkit.block.data.Levelled) {
+                    org.bukkit.block.data.Levelled lvl = (org.bukkit.block.data.Levelled) data;
+                    lvl.setLevel(lvl.getMaximumLevel());   // 3
+                    cauldron.setBlockData(lvl, false);
+                }
+
+                // Optional feedback
+                player.playSound(player.getLocation(), Sound.ITEM_BUCKET_EMPTY, 1f, 1f);
+            } else {
+                ItemStack toRemove = new ItemStack(ingredient, amount); // we remove all quantity of what they're holding instead of just the required amount
+                this.player.getInventory().removeItem(toRemove);
+            }
 
             if(amount == requiredAmount) {
                 Bukkit.getLogger().info("Added " + requiredAmount + " of ingredient " + requiredIngredient + ".");

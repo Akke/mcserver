@@ -2,6 +2,7 @@ package com.akkelw.potionsystem.listeners;
 
 import com.akkelw.potionsystem.CauldronManager;
 import org.bukkit.Location;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 
@@ -112,6 +113,22 @@ public class BlockClickListener implements Listener {
                     proc.processStep(lastBrewingAction, type, amount, blockClicked);
                 }
             }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onUseCauldron(PlayerInteractEvent e) {
+        if (e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (e.getHand() != EquipmentSlot.HAND) return;
+        Block b = e.getClickedBlock(); if (b == null) return;
+
+        Material t = b.getType();
+        boolean isAnyCauldron = (t == Material.CAULDRON) || t.name().endsWith("_CAULDRON");
+        if (!isAnyCauldron) return;
+
+        ItemStack used = e.getItem();
+        if (used != null && used.getType() == Material.BUCKET) {
+            e.setCancelled(true);
         }
     }
 }
