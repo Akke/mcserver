@@ -3,10 +3,7 @@ package com.akkelw.potionsystem.gui;
 import java.util.*;
 import java.util.stream.IntStream;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -50,7 +47,7 @@ public class BrewingOptionsGui implements Listener {
 
     /** Callback you implement to handle button clicks. */
     public interface ActionHandler {
-        void onAction(Player player, ActionType action, Material type, Integer amount);
+        void onAction(Player player, Location loc, ActionType action, Material type, Integer amount);
     }
 
     private final int SIZE = 27; // 3 rows
@@ -81,8 +78,8 @@ public class BrewingOptionsGui implements Listener {
     }
 
     /** Open the GUI for a player. */
-    public void open(Player player) {
-        Inventory inv = Bukkit.createInventory(player, SIZE, TITLE);
+    public void open(Player player, Block cauldron) {
+        Inventory inv = Bukkit.createInventory(new CauldronHolder(cauldron), SIZE, TITLE);
         decorate(inv);
         placeButtons(inv);
         open.put(player.getUniqueId(), inv);
@@ -92,10 +89,27 @@ public class BrewingOptionsGui implements Listener {
     /** Optional: reopen (e.g., after handling something) */
     public void reopen(Player player) {
         Inventory inv = open.get(player.getUniqueId());
-        if (inv == null) { open(player); return; }
+
+        // If no open inventory is tracked, we can't reopen without knowing the cauldron.
+        // Just ignore or tell the player.
+        if (inv == null) {
+            player.sendMessage(ChatColor.RED + "No brewing session found to reopen.");
+            return;
+        }
+
+        // Retrieve the CauldronHolder to get the original cauldron reference
+        if (!(inv.getHolder() instanceof CauldronHolder holder)) {
+            player.sendMessage(ChatColor.RED + "This brewing session is invalid.");
+            open.remove(player.getUniqueId());
+            return;
+        }
+
+        // Rebuild the inventory contents while keeping the same holder
         inv.clear();
         decorate(inv);
         placeButtons(inv);
+
+        // Reopen it for the player
         player.openInventory(inv);
     }
 
@@ -151,6 +165,9 @@ public class BrewingOptionsGui implements Listener {
 
         e.setCancelled(true);
 
+        if (!(top.getHolder() instanceof CauldronHolder holder)) return;
+        Location loc = holder.getCauldronLoc().getBlock().getLocation(); // normalize
+
         ItemStack clicked = e.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
 
@@ -173,13 +190,12 @@ public class BrewingOptionsGui implements Listener {
                 Material type = item.getType();
                 int amount = item.getAmount();
 
-                handler.onAction(p, action, type, amount);
+                handler.onAction(p, loc, action, type, amount);
             } else {
-                handler.onAction(p, action, null, null);
+                handler.onAction(p, loc, action, null, null);
             }
         }
     }
-
 
     @EventHandler
     public void onClose(InventoryCloseEvent e) {

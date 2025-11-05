@@ -8,10 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.akkelw.potionsystem.CauldronManager;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.HumanEntity;
@@ -105,8 +102,21 @@ public class RecipesGui implements Listener {
                 String elixirCode = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
                 if (elixirCode != null) {
                     Player player = (Player) h;
+                    UUID id = h.getUniqueId();
+                    Location loc = cauldron.getLocation();
+
+                    if(!cauldronManager.startUsing(id, loc)) {
+                        player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
+                        player.closeInventory();
+                        return;
+                    }
+
                     RecipeProcess recipeProcess = new RecipeProcess(plugin, player, elixirCode, cauldron);
-                    recipeProcess.start();
+                    if (!cauldronManager.startProcess(recipeProcess)) {
+                        player.sendMessage(ChatColor.DARK_RED + "Couldn’t start process (not owner?).");
+                        cauldronManager.stopUsing(id);
+                        return;
+                    }
                 }
             }
         }

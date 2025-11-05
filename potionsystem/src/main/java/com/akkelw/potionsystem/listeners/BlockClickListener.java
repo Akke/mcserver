@@ -66,38 +66,33 @@ public class BlockClickListener implements Listener {
                         return;
                     }
 
-                    if(!RecipeProcess.hasActive(player)) {
-                        if(cauldronManager.startUsing(id, loc)) {
-                            gui.open(player, blockClicked);
-                        } else {
-                            player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
-                        }
-                    } else {
-                        RecipeProcess proc = RecipeProcess.get(player);
-                        if(proc != null) {
-                            if(proc.isLocked()) {
-                                return;
-                            }
-                        }
+                    RecipeProcess proc = cauldronManager.getProcess(loc);
 
-                        ActionType lastBrewingAction = this.plugin.getLastBrewingAction(player);
-                        if(lastBrewingAction == null) {
-                            this.plugin.openBrewingOptions(player);
-                        } else {
-                            ItemStack item = player.getInventory().getItemInMainHand();
-
-                            if(item != null) {
-                                Material type = item.getType();
-                                int amount = item.getAmount();
-                                
-                                if(proc != null) {
-                                    if(!proc.isLocked()) {
-                                        proc.processStep(lastBrewingAction, type, amount, blockClicked);
-                                    }
-                                }
-                            }
-                        }
+                    if(proc == null) {
+                        gui.open(player, blockClicked);
+                        return;
                     }
+
+                    if(proc.isLocked()) {
+                        player.sendMessage(ChatColor.YELLOW + "That brewing process is locked.");
+                        return;
+                    }
+
+                    // Otherwise, continue the active process step
+                    ActionType lastBrewingAction = plugin.getLastBrewingAction(player);
+                    if (lastBrewingAction == null) {
+                        plugin.openBrewingOptions(player, blockClicked);
+                        return;
+                    }
+
+                    ItemStack item = player.getInventory().getItemInMainHand();
+                    if (item == null) return;
+
+                    Material type = item.getType();
+                    int amount = item.getAmount();
+
+                    // Now safely process the step
+                    proc.processStep(lastBrewingAction, type, amount, blockClicked);
                 }
             }
         }

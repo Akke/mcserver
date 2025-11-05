@@ -35,7 +35,6 @@ import com.akkelw.potionsystem.gui.BrewingOptionsGui.ActionType;
 import net.wesjd.anvilgui.AnvilGUI;
 
 public class RecipeProcess implements Listener {
-    private static final Map<UUID, RecipeProcess> active = new HashMap<>();
     private final Map<UUID, RecipeProcess> currentTask = new HashMap<>();
 
     private final Plugin plugin;
@@ -49,6 +48,8 @@ public class RecipeProcess implements Listener {
     private int stirCountCw = 0;                   
     private int stirCountCcw = 0;
     private final CauldronManager cauldronManager;
+    private final UUID playerId;
+    private final Location cauldronLoc;
 
     public RecipeProcess(Plugin plgn, Player p, String elxCode, Block cauldron) {
         this.plugin = plgn;
@@ -59,11 +60,12 @@ public class RecipeProcess implements Listener {
         assert this.config != null;
         this.actions = this.config.getMapList("actions");
         this.cauldronManager = plgn.getCauldronManager();
+        this.playerId = player.getUniqueId();
+        this.cauldronLoc = cauldron.getLocation().getBlock().getLocation();
     }
 
-    public static RecipeProcess get(Player p) {
-        return active.get(p.getUniqueId());
-    }
+    public UUID getPlayerId() { return playerId; }
+    public Location getCauldronLoc() { return cauldronLoc; }
 
     public boolean isLocked() { return this.locked; }
 
@@ -82,11 +84,6 @@ public class RecipeProcess implements Listener {
 
         UUID id = this.player.getUniqueId();
 
-        if(active.containsKey(id)) {
-            this.player.sendMessage("You're already brewing something!");
-            return;
-        }
-
         int requiredRank = this.config.getInt("required_rank");
         int playerRank = this.plugin.getPotionLevel(id);
 
@@ -97,7 +94,6 @@ public class RecipeProcess implements Listener {
 
         this.plugin.removeLastBrewingAction(this.player);
 
-        active.put(id, this);
         this.player.sendMessage("Started potion making process for recipe '" + this.elixirCode + "'");
 
         this.step = 0;
@@ -141,7 +137,6 @@ public class RecipeProcess implements Listener {
 
     public void finish() {
         reward();
-        active.remove(this.player.getUniqueId());
         this.plugin.removeLastBrewingAction(this.player);
         this.player.closeInventory();
         unlock();
@@ -152,7 +147,6 @@ public class RecipeProcess implements Listener {
     }
 
     public void fail(String s) {
-        active.remove(this.player.getUniqueId());
         this.plugin.removeLastBrewingAction(this.player);
         this.player.closeInventory();
         unlock();
@@ -164,7 +158,6 @@ public class RecipeProcess implements Listener {
     }
 
     public void cancel() {
-        active.remove(this.player.getUniqueId());
         this.plugin.removeLastBrewingAction(this.player);
         this.player.closeInventory();
         unlock();
@@ -172,10 +165,6 @@ public class RecipeProcess implements Listener {
         this.stirCountCw = 0;
         this.stirCountCcw = 0;
         cauldronManager.stopUsing(this.player.getUniqueId());
-    }
-
-    public static boolean hasActive(Player p) {
-        return active.containsKey(p.getUniqueId());
     }
 
     public void processStep(ActionType action, Material material, int materialAmount, Block blockClicked) {
@@ -427,23 +416,36 @@ public class RecipeProcess implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
-        RecipeProcess p = active.remove(e.getPlayer().getUniqueId());
-        if(p != null) p.cancel();
-        cauldronManager.stopUsing(e.getPlayer().getUniqueId());
+        cauldronManager.stopAllForPlayer(e.getPlayer().getUniqueId());
     }
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent e) {
-        if (!(e.getInventory().getHolder() instanceof CauldronHolder)) return;
-        CauldronHolder holder = (CauldronHolder) e.getInventory().getHolder();
-        UUID id = ((Player)e.getPlayer()).getUniqueId();
-        Location loc = holder.getCauldronLoc();
-        if (id.equals(cauldronManager.getUser(loc))) cauldronManager.stopUsing(id);
+        if (!(e.getInventory().getHolder() instanceof CauldronHolder holder)) return;
+
+        Player player = (Player) e.getPlayer();
+        UUID id = player.getUniqueId();
+        Location loc = holder.getCauldronLoc().getBlock().getLocation();
+
+        RecipeProcess proc = cauldronManager.getProcess(loc);
+
+        if (proc == null) {
+            // No brewing started -> make sure there isn't a stale lock (unlikely in your flow)
+            if (id.equals(cauldronManager.getUser(loc))) {
+                cauldronManager.stopUsing(id);
+            }
+            return;
+        }
     }
 
     @EventHandler
     public void onBlockBreak(BlockBreakEvent e) {
-        if (e.getBlock().getType() != Material.CAULDRON && e.getBlock().getType() != Material.WATER_CAULDRON) return;
-        cauldronManager.stopUsing(e.getBlock().getLocation());
+        if (!e.getBlock().getType().name().endsWith("_CAULDRON") &&
+                e.getBlock().getType() != Material.CAULDRON) {
+            return;
+        }
+
+        Location loc = e.getBlock().getLocation().getBlock().getLocation();
+        cauldronManager.stopAllForCauldron(loc);
     }
 }

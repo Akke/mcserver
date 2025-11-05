@@ -4,6 +4,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 import com.akkelw.potionsystem.commands.CauldronDebugCommand;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.material.Cauldron;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -50,8 +51,8 @@ public class Plugin extends JavaPlugin
 
         getCommand("debugcauldronoccupant").setExecutor(new CauldronDebugCommand(cauldronManager));
         
-        brewingOptionsGui = new BrewingOptionsGui(this, (player, action, type, amount) -> {
-            RecipeProcess proc = RecipeProcess.get(player);
+        brewingOptionsGui = new BrewingOptionsGui(this, (player, loc, action, type, amount) -> {
+            RecipeProcess proc = cauldronManager.getProcess(loc);
             if (proc != null) {
                 proc.onBrewAction(action, type, amount);
             }
@@ -60,8 +61,8 @@ public class Plugin extends JavaPlugin
         getServer().getPluginManager().registerEvents(brewingOptionsGui, this);
     }
 
-    public void openBrewingOptions(Player player) {
-        brewingOptionsGui.open(player);
+    public void openBrewingOptions(Player player, Block cauldronBlock) {
+        brewingOptionsGui.open(player, cauldronBlock);
     }
 
     public ActionType getLastBrewingAction(Player player) {
