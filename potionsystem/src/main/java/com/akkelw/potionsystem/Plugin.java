@@ -30,7 +30,7 @@ public class Plugin extends JavaPlugin
     @Override
     public void onEnable()
     {
-        this.cauldronManager = new CauldronManager();
+        this.cauldronManager = new CauldronManager(this);
 
         saveDefaultConfig();
 

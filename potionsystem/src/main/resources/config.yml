@@ -1,36 +1,37 @@
 elixirs:
   elixir_speed:
-    name: Speed Elixir
+    name: "Speed Elixir"
     required_rank: 0
     result:
-      type: POTION
-      potion_effect: SPEED
+      type: "POTION"
+      potion_effect: "SPEED"
+      potion_color: "#00B4FF" # color of the liquid in the bottle (hex code)
       duration: 60       # seconds
-      amplifier: 1       # Speed II
+      amplifier: 0       # 0 = Level 1, 1 = Level 2... etc
     actions:
-      - action: ADD
-        ingredient_name: WATER_BUCKET
+      - action: "ADD"
+        ingredient_name: "WATER_BUCKET"
         amount: 1
 
-      - action: ADD
-        ingredient_name: WHEAT_SEEDS
+      - action: "ADD"
+        ingredient_name: "WHEAT_SEEDS"
         amount: 2
 
-      - action: SET_TEMPERATURE
+      - action: "SET_TEMPERATURE"
         amount: 30
 
-      - action: BOIL
+      - action: "BOIL"
         duration: 5
 
-      - action: STIR_CLOCKWISE
+      - action: "STIR_CW"
         amount: 3
 
-      - action: ADD
-        ingredient_name: ACACIA_BOAT
+      - action: "ADD"
+        ingredient_name: "ACACIA_BOAT"
         amount: 1
 
-      - action: STIR_COUNTERCLOCKWISE
+      - action: "STIR_CCW"
         amount: 2
 
-      - action: WAIT
+      - action: "WAIT"
         duration: 4

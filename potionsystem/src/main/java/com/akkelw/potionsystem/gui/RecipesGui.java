@@ -106,7 +106,6 @@ public class RecipesGui implements Listener {
                     Location loc = cauldron.getLocation();
 
                     if(!cauldronManager.startUsing(id, loc)) {
-                        player.sendMessage(ChatColor.RED + "That cauldron’s already in use!");
                         player.closeInventory();
                         return;
                     }

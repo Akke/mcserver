@@ -4,6 +4,12 @@ import org.bukkit.Material;
 
 public enum Profession {
     // Combat – Basics
+    // endurance - hit points (hp), armor (overall damage reduction)
+    // magic - max mana for magic plugin (make the server run a command to increase max mana, instead of using magic API?)
+    // broomriding - speed of broom, type of broom you can use
+    // gear requirement should be based on total skill levels, total level of all professions combined
+    // using potions should have a level requirement too, same as above ^
+    // spells & charms and defensive arts and dark arts etc the magic plugin should require their levels to be cast
     SPELLS_CHARMS("Spells & Charms", Category.COMBAT, false, Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE),
     DEFENSIVE_ARTS("Defensive Arts", Category.COMBAT, false, Material.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE),
     // Combat – Advanced (choose one)

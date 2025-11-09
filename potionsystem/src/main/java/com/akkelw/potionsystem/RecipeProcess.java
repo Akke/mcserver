@@ -1,16 +1,15 @@
 package com.akkelw.potionsystem;
 
+import com.akkelw.potionsystem.util.ParticleUtil;
 import org.bukkit.*;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.event.Listener;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.ArmorStand;
@@ -29,10 +28,8 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
-
 import com.akkelw.potionsystem.gui.BrewingOptionsGui;
 import com.akkelw.potionsystem.gui.BrewingOptionsGui.ActionType;
-
 import net.wesjd.anvilgui.AnvilGUI;
 
 public class RecipeProcess implements Listener {
@@ -50,6 +47,8 @@ public class RecipeProcess implements Listener {
     private final CauldronManager cauldronManager;
     private final UUID playerId;
     private final Location cauldronLoc;
+    private enum Outcome { FINISH, FAIL, CANCEL };
+    private final java.util.concurrent.atomic.AtomicBoolean ended = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     public RecipeProcess(Plugin plgn, Player p, String elxCode, Block cauldron) {
         this.plugin = plgn;
@@ -68,6 +67,10 @@ public class RecipeProcess implements Listener {
     public Location getCauldronLoc() { return cauldronLoc; }
 
     public boolean isLocked() { return this.locked; }
+
+    public boolean isEnded() {
+        return ended.get();
+    }
 
     private void lock(BrewingOptionsGui.ActionType action) {
         this.locked = true;
@@ -129,7 +132,16 @@ public class RecipeProcess implements Listener {
                     meta.addCustomEffect(new PotionEffect(effectType, duration * 20, amplifier), true);
                 }
 
-                meta.setDisplayName("§b" + this.config.getString("name"));
+                meta.setDisplayName(this.config.getString("name"));
+
+                String hex = result.getString("color", "#00B4FF"); // default nice blue
+                Color potionColor = Color.fromRGB(
+                        Integer.valueOf(hex.substring(1, 3), 16),
+                        Integer.valueOf(hex.substring(3, 5), 16),
+                        Integer.valueOf(hex.substring(5, 7), 16)
+                );
+                meta.setColor(potionColor);
+
                 potion.setItemMeta(meta);
             }
 
@@ -155,42 +167,43 @@ public class RecipeProcess implements Listener {
         }
     }
 
-    public void finish() {
-        reward();
-        this.plugin.removeLastBrewingAction(this.player);
-        this.player.closeInventory();
-        unlock();
-        this.player.sendMessage("You finished brewing " + this.elixirCode);
-        this.stirCountCw = 0;
-        this.stirCountCcw = 0;
-        cauldronManager.setWaterLevel(cauldron,0);
-        cauldronManager.stopUsing(this.player.getUniqueId());
-        org.bukkit.event.HandlerList.unregisterAll(this);
+    private void end(Outcome outcome) {
+        // Prevent running twice (e.g., multiple events firing)
+        if (!ended.compareAndSet(false, true)) return;
+
+        // Outcome-specific actions
+        switch (outcome) {
+            case FINISH -> {
+                reward();
+                player.sendMessage("You finished brewing " + this.elixirCode);
+            }
+            case FAIL -> {
+                player.sendMessage("Oops! You did something wrong and the potion exploded! (" + this.elixirCode + ")");
+            }
+            case CANCEL -> {
+                player.sendMessage("Brewing cancelled.");
+            }
+        }
+
+        // Shared cleanup (keep it all in one place)
+        try {
+            this.plugin.removeLastBrewingAction(this.player);
+            if (player != null && player.isOnline()) player.closeInventory();
+            unlock();
+            this.stirCountCw = 0;
+            this.stirCountCcw = 0;
+            cauldronManager.setWaterLevel(cauldron, 0);
+            cauldronManager.stopUsing(this.player.getUniqueId());
+        } finally {
+            // Always unregister, even if something above throws
+            cauldronManager.onProcessEnded(cauldronLoc);
+            org.bukkit.event.HandlerList.unregisterAll(this);
+        }
     }
 
-    public void fail() {
-        this.plugin.removeLastBrewingAction(this.player);
-        this.player.closeInventory();
-        unlock();
-        this.player.sendMessage("Oops! You did something wrong and the potion exploded! (" + this.elixirCode + ")");
-        this.stirCountCw = 0;
-        this.stirCountCcw = 0;
-        cauldronManager.setWaterLevel(cauldron,0);
-        cauldronManager.stopUsing(this.player.getUniqueId());
-        org.bukkit.event.HandlerList.unregisterAll(this);
-    }
-
-    public void cancel() {
-        this.plugin.removeLastBrewingAction(this.player);
-        this.player.closeInventory();
-        unlock();
-        this.player.sendMessage("Brewing cancelled.");
-        this.stirCountCw = 0;
-        this.stirCountCcw = 0;
-        cauldronManager.setWaterLevel(cauldron,0);
-        cauldronManager.stopUsing(this.player.getUniqueId());
-        org.bukkit.event.HandlerList.unregisterAll(this);
-    }
+    public void finish() { end(Outcome.FINISH); }
+    public void fail()   { end(Outcome.FAIL); }
+    public void cancel() { end(Outcome.CANCEL); }
 
     public void processStep(ActionType action, Material material, int materialAmount, Block blockClicked) {
         Map<?, ?> current = this.actions.get(this.step-1);
@@ -216,8 +229,9 @@ public class RecipeProcess implements Listener {
             case ADD: // have to lock since we are waiting for the player to add ingredients by clicking on the cauldron with them (so GUI wont open)
                 lock(action);
 
-                plugin.getLogger().info("Material is " + material);
-                plugin.getLogger().info("materialAmount is " + materialAmount);
+                ParticleUtil.splash(blockClicked);
+
+                cauldronManager.emitSound(cauldron, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, true);
 
                 if(addIngredient(material, materialAmount)) {
                     unlock();
@@ -232,6 +246,8 @@ public class RecipeProcess implements Listener {
                 amount = (tempAmnt != null) ? tempAmnt : -1;
 
                 askNumberInput("Set Temperature", amount, () -> {
+                    ParticleUtil.steam(blockClicked);
+                    cauldronManager.emitSound(cauldron, Sound.ENTITY_BLAZE_BURN, 2.0f, false);
                     nextStep();
                 });
 
@@ -243,9 +259,21 @@ public class RecipeProcess implements Listener {
                 askNumberInput("Set Boil Duration", duration, () -> {
                     lock(action);
 
+                    // Start boiling for 10s, pulsing every 7 ticks
+                    BukkitTask boil = ParticleUtil.loopBoil(plugin, blockClicked, duration, 1);
+
+                    BukkitTask boilingSound = cauldronManager.loopSound(blockClicked, Sound.BLOCK_BUBBLE_COLUMN_WHIRLPOOL_AMBIENT, 2.0f, true, duration, 3);
+
                     startBlockTimer(this.plugin, blockClicked, duration, () -> {
                         unlock();
                         nextStep();
+
+                        // Stop it early (make sure to null-check & isCancelled)
+                        if (boil != null && !boil.isCancelled()) boil.cancel();
+
+                        if(!boilingSound.isCancelled()) {
+                            boilingSound.cancel();
+                        }
                     });
                 });
 
@@ -256,8 +284,16 @@ public class RecipeProcess implements Listener {
 
                 lock(action);
 
+                ParticleUtil.arcane(blockClicked);
+
+                BukkitTask stirringSoundCw = cauldronManager.loopSound(blockClicked, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_INSIDE, 1.0f, true, 2, 1);
+
                 startBlockTimer(this.plugin, blockClicked, 2, () -> {
                     if(this.stirCountCcw > 0) {
+                        if(!stirringSoundCw.isCancelled()) {
+                            stirringSoundCw.cancel();
+                        }
+
                         fail();
                         return;
                     }
@@ -265,6 +301,9 @@ public class RecipeProcess implements Listener {
                     unlock();
                     this.plugin.removeLastBrewingAction(this.player);
                     this.stirCountCw++;
+                    if(!stirringSoundCw.isCancelled()) {
+                        stirringSoundCw.cancel();
+                    }
                     if(this.stirCountCw == amount) {
                         nextStep();
                     }
@@ -277,8 +316,16 @@ public class RecipeProcess implements Listener {
 
                 lock(action);
 
+                ParticleUtil.arcane(blockClicked);
+
+                BukkitTask stirringSoundCcw = cauldronManager.loopSound(blockClicked, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_INSIDE, 1.0f, true, 2, 1);
+
                 startBlockTimer(this.plugin, blockClicked, 2, () -> {
                     if(this.stirCountCw > 0) {
+                        if(!stirringSoundCcw.isCancelled()) {
+                            stirringSoundCcw.cancel();
+                        }
+
                         fail();
                         return;
                     }
@@ -286,6 +333,9 @@ public class RecipeProcess implements Listener {
                     unlock();
                     this.plugin.removeLastBrewingAction(this.player);
                     this.stirCountCcw++;
+                    if(!stirringSoundCcw.isCancelled()) {
+                        stirringSoundCcw.cancel();
+                    }
                     if(this.stirCountCcw == amount) {
                         nextStep();
                     }
@@ -299,7 +349,15 @@ public class RecipeProcess implements Listener {
                 askNumberInput("Set Wait Duration", duration, () -> {
                     lock(action);
 
+                    BukkitTask simmer = ParticleUtil.loopBoil(plugin, blockClicked, duration, 3);
+
+                    BukkitTask waitingSound = cauldronManager.loopSound(blockClicked, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_AMBIENT, 1.0f, true, duration, 3);
+
                     startBlockTimer(this.plugin, blockClicked, duration, () -> {
+                        if (simmer != null && !simmer.isCancelled()) simmer.cancel();
+                        if(!waitingSound.isCancelled()) {
+                            waitingSound.cancel();
+                        }
                         unlock();
                         nextStep();
                     });
@@ -429,7 +487,7 @@ public class RecipeProcess implements Listener {
         BukkitRunnable runnable = new BukkitRunnable() {
             int t = seconds;
             @Override public void run() {
-                if (t <= 0 || block.getType() != Material.CAULDRON) {
+                if (t <= 0 || (block.getType() != Material.CAULDRON && block.getType() != Material.WATER_CAULDRON)) {
                     stand.remove();
                     cancel();
                     if (onFinish != null) onFinish.run();
